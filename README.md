@@ -5,7 +5,7 @@
 <h1 align="center">MEXC Balance Splitter</h1>
 
 <p align="center">
-    <i>- A Firefox extension to parse your MEXC Futures balance from the webpage (no API), calculate 1% of it, and split that value into three equal legs.</i>
+    <i>Risk management is the key.</i>
 </p>
 
 ---
@@ -31,8 +31,8 @@
 
 1. Clone this repo:
    ```bash
-   git clone https://github.com/worldspawn-web/mexc_position_riskmanager.git
-   cd mexc_position_riskmanager
+   git clone https://github.com/worldspawn-web/mexc_balance_splitter.git
+   cd mexc_balance_splitter
    ```
 2. Open Firefox → `about:debugging#/runtime/this-firefox.`
 3. Click `Load Temporary Add-on...` and select `extension/manifest.json`.
