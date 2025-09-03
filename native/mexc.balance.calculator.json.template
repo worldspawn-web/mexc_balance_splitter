@@ -1,0 +1,7 @@
+{
+  "name": "mexc.balance.calculator",
+  "description": "MEXC Balance Splitter native messaging host (Python)",
+  "path": "__HOST_PATH__",
+  "type": "stdio",
+  "allowed_extensions": ["mexc-balance-splitter@example.com"]
+}
