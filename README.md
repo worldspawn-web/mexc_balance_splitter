@@ -8,8 +8,6 @@
     <i>Risk management is the key.</i>
 </p>
 
----
-
 ## ✨ Features
 
 - 📊 **Parse balance directly from the DOM** — no need for API keys.  
@@ -24,6 +22,14 @@
 - ✅ No data collection.
 - ✅ No external requests.
 - ✅ Settings (selector, decimals, panel position) are stored locally in `storage.local`.
+
+## 🐈‍⬛ TODO
+
+- [ ] Adjustable percentage
+- [ ] Adjustable amount of 'steps/legs'
+- [ ] Google Chrome & Opera Support
+- [ ] Auto-paste
+- [ ] Better balance detection
 
 ## 🚀 Quick Start
 
