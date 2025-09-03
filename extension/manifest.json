@@ -1,5 +1,5 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "MEXC Balance Splitter",
   "description": "Parses the MEXC page balance (no API), computes 1% and splits it into 3 parts with a small on-page widget.",
   "version": "0.1.0",
@@ -11,7 +11,8 @@
     "https://www.mexc.sg/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": ["background.js"],
+    "persistent": false
   },
   "content_scripts": [
     {
@@ -26,9 +27,6 @@
       "run_at": "document_idle"
     }
   ],
-  "action": {
-    "default_title": "MEXC Balance Splitter"
-  },
   "browser_specific_settings": {
     "gecko": {
       "id": "mexc-balance-splitter@example.com",
