@@ -1,4 +1,4 @@
-/* content.js */
+/* content.js (fixed: ignore overlay subtree, robust selector resolution) */
 (function () {
   const ext = window.browser || window.chrome;
   const OVERLAY_ID = "mbs-overlay";
@@ -9,6 +9,7 @@
   // --- UI overlay ---
   const overlay = document.createElement("div");
   overlay.id = OVERLAY_ID;
+  overlay.setAttribute("data-mbs-overlay-root", ""); // mark subtree
   overlay.innerHTML = `
     <div id="mbs-header">
       <div class="mbs-pill">MEXC</div>
@@ -53,21 +54,18 @@
   `;
   document.documentElement.appendChild(overlay);
 
+  // helpers to avoid overlay collisions
+  const isInsideOverlay = (el) => !!el && (el === overlay || overlay.contains(el));
+
   // Draggable header
   (function makeDraggable() {
     const header = overlay.querySelector("#mbs-header");
-    let startX = 0,
-      startY = 0,
-      origX = 0,
-      origY = 0,
-      dragging = false;
+    let startX = 0, startY = 0, origX = 0, origY = 0, dragging = false;
     header.addEventListener("mousedown", (e) => {
       dragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
+      startX = e.clientX; startY = e.clientY;
       const rect = overlay.getBoundingClientRect();
-      origX = rect.left;
-      origY = rect.top;
+      origX = rect.left; origY = rect.top;
       e.preventDefault();
     });
     document.addEventListener("mousemove", (e) => {
@@ -75,7 +73,7 @@
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
       overlay.style.left = Math.max(6, origX + dx) + "px";
-      overlay.style.top = Math.max(6, origY + dy) + "px";
+      overlay.style.top  = Math.max(6, origY + dy) + "px";
     });
     document.addEventListener("mouseup", async () => {
       if (!dragging) return;
@@ -101,11 +99,7 @@
   };
 
   // Load & persist settings (per-domain)
-  const defaultSettings = {
-    selector: "",
-    decimals: 2,
-    panelPos: { top: 12, left: 12 },
-  };
+  const defaultSettings = { selector: "", decimals: 2, panelPos: { top: 12, left: 12 } };
   let settings = { ...defaultSettings };
 
   async function loadSettings() {
@@ -122,9 +116,7 @@
           }
           resolve();
         });
-      } catch (_e) {
-        resolve();
-      }
+      } catch (_e) { resolve(); }
     });
   }
 
@@ -133,18 +125,12 @@
       try {
         const rect = overlay.getBoundingClientRect();
         settings.selector = els.sel.value.trim();
-        settings.decimals = Math.max(
-          0,
-          Math.min(8, parseInt(els.dec.value || "2", 10)),
-        );
+        settings.decimals = Math.max(0, Math.min(8, parseInt(els.dec.value || "2", 10)));
         settings.panelPos = { top: Math.round(rect.top), left: Math.round(rect.left) };
         const key = STORAGE_KEY + "|" + location.host;
-        const obj = {};
-        obj[key] = settings;
+        const obj = {}; obj[key] = settings;
         (ext.storage?.local || ext.storage).set(obj, () => resolve());
-      } catch (_e) {
-        resolve();
-      }
+      } catch (_e) { resolve(); }
     });
   }
 
@@ -154,10 +140,7 @@
   });
   els.close.addEventListener("click", () => overlay.remove());
   els.sel.addEventListener("change", saveSettings);
-  els.dec.addEventListener("change", () => {
-    saveSettings();
-    computeAndRender();
-  });
+  els.dec.addEventListener("change", () => { saveSettings(); computeAndRender(); });
 
   overlay.querySelectorAll("button[data-copy]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -174,13 +157,12 @@
       legB: overlay.querySelector("#mbs-leg2")?.textContent?.trim(),
       legC: overlay.querySelector("#mbs-leg3")?.textContent?.trim(),
     };
-    const json = JSON.stringify(data);
-    navigator.clipboard?.writeText(json);
+    navigator.clipboard?.writeText(JSON.stringify(data));
     els.copyAll.textContent = "Copied JSON";
     setTimeout(() => (els.copyAll.textContent = "Copy A/B/C"), 1200);
   });
 
-  // Element picker
+  // Element picker (overlay is click-through while picking)
   let picking = false;
   let lastHover;
   function cssPath(el) {
@@ -188,18 +170,12 @@
     const path = [];
     while (el && el.nodeType === 1) {
       let sel = el.nodeName.toLowerCase();
-      if (el.id) {
-        sel += "#" + el.id;
-        path.unshift(sel);
-        break;
-      } else {
-        let sib = el,
-          nth = 1;
-        while ((sib = sib.previousElementSibling)) {
-          if (sib.nodeName.toLowerCase() === sel) nth++;
-        }
-        sel += `:nth-of-type(${nth})`;
+      if (el.id) { sel += "#" + el.id; path.unshift(sel); break; }
+      let sib = el, nth = 1;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.nodeName.toLowerCase() === sel) nth++;
       }
+      sel += `:nth-of-type(${nth})`;
       path.unshift(sel);
       el = el.parentElement;
     }
@@ -207,85 +183,73 @@
   }
   function highlight(el, on) {
     if (!el) return;
-    if (on) {
-      el.__mbs_prevOutline = el.style.outline;
-      el.style.outline = "2px solid #8aa8ff";
-    } else if ("__mbs_prevOutline" in el) {
-      el.style.outline = el.__mbs_prevOutline;
-      delete el.__mbs_prevOutline;
-    }
+    if (on) { el.__mbs_prevOutline = el.style.outline; el.style.outline = "2px solid #8aa8ff"; }
+    else if ("__mbs_prevOutline" in el) { el.style.outline = el.__mbs_prevOutline; delete el.__mbs_prevOutline; }
   }
   els.pick.addEventListener("click", () => {
     picking = true;
-    overlay.style.pointerEvents = "none"; // hit-test through overlay
+    overlay.style.pointerEvents = "none";
     document.body.style.cursor = "crosshair";
   });
-  document.addEventListener(
-    "mousemove",
-    (e) => {
-      if (!picking) return;
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      if (el && el !== lastHover) {
-        highlight(lastHover, false);
-        lastHover = el;
-        highlight(lastHover, true);
-      }
-    },
-    true,
-  );
-  document.addEventListener(
-    "click",
-    async (e) => {
-      if (!picking) return;
-      e.preventDefault();
-      e.stopPropagation();
-      picking = false;
-      document.body.style.cursor = "";
-      overlay.style.pointerEvents = "";
+  document.addEventListener("mousemove", (e) => {
+    if (!picking) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (el && el !== lastHover) {
       highlight(lastHover, false);
-      const sel = cssPath(lastHover);
-      els.sel.value = sel;
-      await saveSettings();
-      computeAndRender();
-    },
-    true,
-  );
+      lastHover = el;
+      highlight(lastHover, true);
+    }
+  }, true);
+  document.addEventListener("click", async (e) => {
+    if (!picking) return;
+    e.preventDefault(); e.stopPropagation();
+    picking = false;
+    document.body.style.cursor = "";
+    overlay.style.pointerEvents = "";
+    highlight(lastHover, false);
+    if (isInsideOverlay(lastHover)) return; // never allow picking overlay
+    const sel = cssPath(lastHover);
+    els.sel.value = sel;
+    await saveSettings();
+    computeAndRender();
+  }, true);
 
   // Balance parsing
   function parseBalanceFromText(txt) {
     if (!txt) return null;
     txt = txt.replace(/\s+/g, " ").trim();
-    // remove currency suffixes
     txt = txt.replace(/(USDT|USD|\$)/gi, "");
-    // pick the first numeric-like token
-    const m = txt.match(/[-+]?\d{1,3}(?:[ ,.]?\d{3})*(?:[\.,]\d+)?/);
+    const m = txt.match(/[-+]?\d{1,3}(?:[ ,.]?\d{3})*(?:[.,]\d+)?/);
     if (!m) return null;
     let num = m[0].replace(/ /g, "");
-    if (num.indexOf(",") >= 0 && num.indexOf(".") >= 0) {
-      // both present -> comma as thousands
-      num = num.replace(/,/g, "");
-    } else if (num.indexOf(",") >= 0) {
-      // comma as decimal
-      num = num.replace(",", ".");
-    }
-    num = num.replace(/,/g, ""); // safety
+    if (num.includes(",") && num.includes(".")) num = num.replace(/,/g, "");
+    else if (num.includes(",")) num = num.replace(",", ".");
+    num = num.replace(/,/g, "");
     const val = parseFloat(num);
     return Number.isFinite(val) ? val : null;
   }
 
-  function findBalanceElement(selector) {
-    if (selector) {
-      try {
-        const el = document.querySelector(selector);
-        if (el) return el;
-      } catch (_e) {}
+  function resolveBySelector(selector) {
+    if (!selector) return null;
+    let list;
+    try { list = Array.from(document.querySelectorAll(selector)); } catch (_e) { return null; }
+    for (const el of list) {
+      if (!isInsideOverlay(el)) return el;
     }
+    return null;
+  }
+
+  function findBalanceElement(selector) {
+    // 1) exact selector outside overlay
+    const bySel = resolveBySelector(selector);
+    if (bySel) return bySel;
+
+    // 2) heuristic search, but skip the overlay subtree
     const candidates = Array.from(
-      document.querySelectorAll(
-        '[class*="available"],[class*="balance"],[data-balance],span,div',
-      ),
-    ).slice(0, 1500);
+      document.querySelectorAll('[class*="available"],[class*="balance"],[data-balance],span,div')
+    ).slice(0, 2000);
     for (const el of candidates) {
+      if (isInsideOverlay(el)) continue;
       const txt = (el.textContent || "").toLowerCase();
       if (/(available|balance|доступно|баланс|equity|assets)/.test(txt)) {
         const val = parseBalanceFromText(el.textContent);
@@ -296,19 +260,28 @@
   }
 
   let currentBalance = null;
+  let observedEl = null;
   let observer = null;
 
   function observe(el) {
     if (observer) observer.disconnect();
+    observedEl = el;
     observer = new MutationObserver(() => {
-      updateBalance(el);
+      // if element got detached or became part of overlay accidentally, re-resolve
+      if (!observedEl || !document.contains(observedEl) || isInsideOverlay(observedEl)) {
+        const re = findBalanceElement(settings.selector);
+        if (re) { observe(re); updateBalance(re); }
+        return;
+      }
+      updateBalance(observedEl);
     });
     observer.observe(el, { childList: true, subtree: true, characterData: true });
   }
 
   function updateBalance(el) {
     try {
-      const val = parseBalanceFromText(el?.textContent || "");
+      if (!el || isInsideOverlay(el)) return;
+      const val = parseBalanceFromText(el.textContent || "");
       if (val !== null && val !== currentBalance) {
         currentBalance = val;
         els.balance.textContent = String(val);
@@ -331,34 +304,27 @@
           els.l1.textContent = a.toFixed(decimals);
           els.l2.textContent = b.toFixed(decimals);
           els.l3.textContent = c.toFixed(decimals);
-        },
+        }
       );
     } catch (_e) {}
   }
 
   async function bootstrap() {
     await loadSettings();
-    if (settings.selector) {
-      const el = findBalanceElement(settings.selector);
-      if (el) {
-        observe(el);
-        updateBalance(el);
-      }
-    }
-    // fallback periodic scan
+    const el = findBalanceElement(settings.selector);
+    if (el) { observe(el); updateBalance(el); }
+
+    // If balance still unknown, retry periodically
     setInterval(() => {
       if (currentBalance == null) {
-        const el = findBalanceElement(settings.selector);
-        if (el) {
-          observe(el);
-          updateBalance(el);
-        }
+        const el2 = findBalanceElement(settings.selector);
+        if (el2) { observe(el2); updateBalance(el2); }
       }
     }, 2000);
 
     els.refresh.addEventListener("click", () => {
-      const el = findBalanceElement(settings.selector);
-      if (el) updateBalance(el);
+      const el3 = findBalanceElement(settings.selector);
+      if (el3) { observe(el3); updateBalance(el3); }
     });
   }
 
