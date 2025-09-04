@@ -25,11 +25,12 @@
 
 ## 🐈‍⬛ TODO
 
+- [x] Google Chrome & Opera Support
 - [ ] Adjustable percentage
 - [ ] Adjustable amount of 'steps/legs'
-- [ ] Google Chrome & Opera Support
 - [ ] Auto-paste
 - [ ] Better balance detection
+- [ ] Multiple platforms support (Weex, BingX, Bybit)
 
 ## 🚀 Quick Start
 
