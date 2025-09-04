@@ -1,0 +1,7 @@
+{
+  "name": "mexc.balance.calculator",
+  "description": "MEXC Balance Splitter native host (Python)",
+  "path": "__HOST_PATH__",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://__OPERA_EXT_ID__/"]
+}
