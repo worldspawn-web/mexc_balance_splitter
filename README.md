@@ -41,6 +41,8 @@
    git clone https://github.com/worldspawn-web/mexc_balance_splitter.git
    cd mexc_balance_splitter
    ```
+- Run `native/install_windows.bat`
+- Continue installation for your specific browser... ⬇️
 
 ### Chrome & Opera
 
