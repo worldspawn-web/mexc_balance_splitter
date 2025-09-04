@@ -1,0 +1,38 @@
+{
+  "manifest_version": 2,
+  "name": "MEXC Balance Splitter",
+  "description": "Reads MEXC page balance (no API), computes 1% and splits into 3 equal legs.",
+  "version": "0.1.2",
+  "permissions": ["storage", "nativeMessaging", "clipboardWrite"],
+  "host_permissions": [
+    "https://www.mexc.com/*",
+    "https://futures.mexc.com/*",
+    "https://contract.mexc.com/*",
+    "https://www.mexc.sg/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.mexc.com/*",
+        "https://futures.mexc.com/*",
+        "https://contract.mexc.com/*",
+        "https://www.mexc.sg/*"
+      ],
+      "js": ["content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "MEXC Balance Splitter",
+    "default_icon": { "48": "icons/icon-48.png", "96": "icons/icon-96.png", "128": "icons/icon-128.png" }
+  },
+  "icons": { "48": "icons/icon-48.png", "96": "icons/icon-96.png", "128": "icons/icon-128.png" },
+  "browser_specific_settings": {
+    "gecko": { "id": "mexc-balance-splitter@example.com", "strict_min_version": "78.0" }
+  }
+}
