@@ -1,0 +1,14 @@
+{
+  "name": "mexc-balance-splitter",
+  "private": true,
+  "scripts": {
+    "prep:chromium": "cp extension/manifest.chromium.json extension/manifest.json",
+    "prep:firefox": "cp extension/manifest.firefox.json extension/manifest.json",
+    "lint": "web-ext lint -s ./extension",
+    "build:chromium": "npm run prep:chromium && web-ext build -s ./extension -o",
+    "build:firefox": "npm run prep:firefox && web-ext build -s ./extension -o",
+    "run:firefox": "npm run prep:firefox && web-ext run -s ./extension --firefox=firefox",
+    "run:chromium": "npm run prep:chromium && web-ext run -s ./extension --target=chromium"
+  },
+  "devDependencies": {}
+}
