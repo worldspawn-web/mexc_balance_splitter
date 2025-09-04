@@ -36,15 +36,30 @@
 
 ### Development build (temporary add-on)
 
-1. Clone this repo:
+- Clone this repo:
    ```bash
    git clone https://github.com/worldspawn-web/mexc_balance_splitter.git
    cd mexc_balance_splitter
    ```
-2. Open Firefox → `about:debugging#/runtime/this-firefox.`
-3. Click `Load Temporary Add-on...` and select `extension/manifest.json`.
-4. Go to MEXC Futures, open the widget (top-left), click Pick element, and select your balance element.
+
+### Chrome & Opera
+
+1. Open your browser (Chrome, Firefox, Opera).
+2. Open your extensions tab by pasting one of the following links:
+```
+Chrome → chrome://extensions/
+Opera → opera://extensions/
+```
+3. Make sure that `Developer Mode` is enabled.
+4. Click `Load unpacked` and choose `extension-chromium` folder.
 5. PROFIT?!
+
+### Firefox
+
+1. Open Firefox.
+2. Go to `about:debugging#/runtime/this-firefox`
+3. Click `Load Temporary Add-on...` and select `extension-firefox/manifest.json`.
+4. PROFIT?!
 
 ## 🖥️ Native Host (optional)
 
