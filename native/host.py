@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """
-MEXC Balance Splitter native messaging host.
+Native host for MEXC Balance Splitter.
 
-Reads messages from stdin, computes 1% of balance and splits into 3 rounded legs,
-ensuring the sum of legs matches the rounded 1% value. Communicates using the
-Native Messaging protocol (4-byte little-endian length + UTF-8 JSON).
+Accepts:
+{
+  "action": "compute",
+  "balance": <float|str>,
+  "percent": <float>,   # default 1.0
+  "steps": <int>,       # default 3
+  "decimals": <int>     # default 2
+}
+
+Returns:
+{ "target": <float>, "legs": [<float> ...] }
 """
 from __future__ import annotations
 
@@ -15,32 +23,20 @@ import sys
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 
-# Set enough precision for money math
+# more precision for money math
 getcontext().prec = 28
 
 
 @dataclass
 class SplitResult:
-    one_percent: Decimal
-    legs: tuple[Decimal, Decimal, Decimal]
-
-    def to_jsonable(self, decimals: int) -> dict:
-        q = Decimal(10) ** -decimals
-        return {
-            "onePercent": float(self.one_percent.quantize(q, rounding=ROUND_HALF_UP)),
-            "legs": [
-                float(self.legs[0].quantize(q, rounding=ROUND_HALF_UP)),
-                float(self.legs[1].quantize(q, rounding=ROUND_HALF_UP)),
-                float(self.legs[2].quantize(q, rounding=ROUND_HALF_UP)),
-            ],
-        }
+    target: Decimal
+    legs: tuple[Decimal, ...]
 
 
 def _read_message(stdin: io.BufferedReader) -> dict | None:
-    """Read a single Native Messaging message from stdin."""
     raw_length = stdin.read(4)
     if len(raw_length) == 0:
-        return None  # EOF
+        return None
     if len(raw_length) < 4:
         return None
     message_length = struct.unpack("<I", raw_length)[0]
@@ -56,58 +52,63 @@ def _read_message(stdin: io.BufferedReader) -> dict | None:
 
 
 def _send_message(stdout: io.BufferedWriter, message: dict) -> None:
-    """Send a single Native Messaging message to stdout."""
     data = json.dumps(message, separators=(",", ":")).encode("utf-8")
     stdout.write(struct.pack("<I", len(data)))
     stdout.write(data)
     stdout.flush()
 
 
-def split_balance(balance: Decimal, decimals: int = 2) -> SplitResult:
+def split_balance(balance: Decimal, percent: Decimal, steps: int, decimals: int) -> SplitResult:
     """
-    Compute 1% of the balance and split into 3 legs.
-    The legs are rounded to the given decimals and adjusted so their sum equals the rounded 1%.
+    Compute <percent>% of balance, split into <steps> legs, and round to <decimals>.
+    Ensures sum(legs) == rounded target (with minimal unit adjustments).
     """
-    q = Decimal(10) ** -decimals
-    one = (balance * Decimal("0.01")).quantize(q, rounding=ROUND_HALF_UP)
-    base = one / Decimal(3)
-    # Round each leg
-    l1 = base.quantize(q, rounding=ROUND_HALF_UP)
-    l2 = base.quantize(q, rounding=ROUND_HALF_UP)
-    l3 = base.quantize(q, rounding=ROUND_HALF_UP)
-    # Adjust for rounding remainder
-    remainder = one - (l1 + l2 + l3)
+    d = max(0, min(8, int(decimals)))
+    n = max(1, int(steps))
+    q = (Decimal(10) ** -d)
+
+    target = (balance * (percent / Decimal("100"))).quantize(q, rounding=ROUND_HALF_UP)
+    base = target / Decimal(n)
+
+    legs = [base.quantize(q, rounding=ROUND_HALF_UP) for _ in range(n)]
+    remainder = target - sum(legs)
+
+    # distribute remainder in minimal units
+    step = q if remainder >= 0 else -q
+    i = 0
     while remainder != 0:
-        # Distribute the remainder in minimal increments to match 'one'
-        if remainder > 0:
-            l1 += q
-        else:
-            l1 -= q
-        remainder = one - (l1 + l2 + l3)
-    return SplitResult(one_percent=one, legs=(l1, l2, l3))
+        legs[i % n] += step
+        remainder = target - sum(legs)
+        i += 1
+
+    return SplitResult(target=target, legs=tuple(legs))
 
 
 def main() -> None:
-    """Main event loop for the native messaging host."""
     stdin = sys.stdin.buffer
     stdout = sys.stdout.buffer
 
     while True:
-        message = _read_message(stdin)
-        if message is None:
+        msg = _read_message(stdin)
+        if msg is None:
             break
         try:
-            action = message.get("action")
-            if action != "compute":
+            if msg.get("action") != "compute":
                 _send_message(stdout, {"__error": "Unsupported action"})
                 continue
 
-            balance = Decimal(str(message.get("balance", "0")))
-            decimals = int(message.get("decimals", 2))
-            decimals = max(0, min(8, decimals))
+            balance = Decimal(str(msg.get("balance", "0")))
+            percent = Decimal(str(msg.get("percent", "1")))
+            steps = int(msg.get("steps", 3))
+            decimals = int(msg.get("decimals", 2))
 
-            result = split_balance(balance, decimals)
-            _send_message(stdout, result.to_jsonable(decimals))
+            res = split_balance(balance, percent, steps, decimals)
+            q = (Decimal(10) ** -max(0, min(8, int(decimals))))
+            payload = {
+                "target": float(res.target.quantize(q, rounding=ROUND_HALF_UP)),
+                "legs": [float(x.quantize(q, rounding=ROUND_HALF_UP)) for x in res.legs],
+            }
+            _send_message(stdout, payload)
 
         except Exception as exc:  # noqa: BLE001
             _send_message(stdout, {"__error": str(exc)})
